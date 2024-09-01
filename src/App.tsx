@@ -100,6 +100,8 @@ function App() {
     iframeWindow.postMessage(serializedMessage, "*");
   };
 
+  const gameUrl = "/godot-react/game_build/index.html";
+
   return (
     <Stack
       sx={{
@@ -118,7 +120,8 @@ function App() {
         <iframe
           ref={iframeRef}
           style={{ border: "none" }}
-          src="/game_build/index.html"
+          // Have to add the base path here
+          src={gameUrl}
           title="game"
           width="100%"
           height="100%"
