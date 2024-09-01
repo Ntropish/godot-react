@@ -30,8 +30,6 @@ function App() {
       if (event.source !== iframe.contentWindow) return;
 
       if (event.data.type === "godot_oncontextmenu") {
-        console.log("Context Menu", event.data);
-
         // {
         //     "screen_point": {
         //         "x": 0.72882866859436,
@@ -53,8 +51,8 @@ function App() {
         setContextMenu({
           open: true,
           anchorPosition: {
-            top: event.data.screen_point.y,
-            left: event.data.screen_point.x,
+            top: event.data.screen_point.y / 1.5,
+            left: event.data.screen_point.x / 1.5,
           },
         });
       }
@@ -64,37 +62,6 @@ function App() {
 
     return () => {
       window.removeEventListener("message", handleMessage);
-    };
-  }, []);
-
-  console.log("context position", contextMenu.anchorPosition);
-
-  // example of sending message to iframe
-  useEffect(() => {
-    // sends message to iframe every 5 seconds
-    const interval = setInterval(() => {
-      const iframe = iframeRef.current;
-      if (!iframe) return;
-
-      const iframeWindow = iframe.contentWindow;
-      if (!iframeWindow) return;
-
-      const message = {
-        type: "godot_message",
-        payload: {
-          message: "Hello from React",
-        },
-      };
-
-      const serializedMessage = JSON.stringify(message);
-
-      console.log("Sending message to iframe", serializedMessage);
-
-      iframeWindow.postMessage(serializedMessage, "*");
-    }, 5000);
-
-    return () => {
-      clearInterval(interval);
     };
   }, []);
 
@@ -111,11 +78,9 @@ function App() {
     };
 
     const serializedMessage = JSON.stringify(message);
-    console.log("Sending go_to message to iframe", serializedMessage);
     iframeWindow.postMessage(serializedMessage, "*");
   };
 
-  // show iframe of /public/game_build/index.html
   return (
     <Box
       sx={{
@@ -131,7 +96,7 @@ function App() {
         src="/game_build/index.html"
         title="game"
         width="100%"
-        height="80%"
+        height="100%"
       ></iframe>
 
       <ContextMenu
