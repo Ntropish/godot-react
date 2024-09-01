@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from "react";
 
-import { Box } from "@mui/material";
+import { Box, Stack, Slider, InputLabel } from "@mui/material";
 import "./App.css";
 import ContextMenu from "./ContextMenu";
 
@@ -18,6 +18,25 @@ function App() {
   });
 
   const [actions, setActions] = useState<Action[]>([]);
+
+  const [playerSpeed, setPlayerSpeed] = useState(5);
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    const iframeWindow = iframe.contentWindow;
+    if (!iframeWindow) return;
+
+    const message = {
+      type: "godot_set_player_speed",
+      payload: playerSpeed,
+    };
+
+    const serializedMessage = JSON.stringify(message);
+
+    iframeWindow.postMessage(serializedMessage, "*");
+  }, [playerSpeed]);
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -82,31 +101,67 @@ function App() {
   };
 
   return (
-    <Box
+    <Stack
       sx={{
         height: "100vh",
         width: "100vw",
         overflow: "hidden",
       }}
-      onContextMenu={(e) => e.preventDefault()}
+      direction="row"
     >
-      <iframe
-        ref={iframeRef}
-        style={{ border: "none" }}
-        src="/game_build/index.html"
-        title="game"
-        width="100%"
-        height="100%"
-      ></iframe>
+      <Box
+        onContextMenu={(e) => e.preventDefault()}
+        sx={{
+          flexGrow: 1,
+        }}
+      >
+        <iframe
+          ref={iframeRef}
+          style={{ border: "none" }}
+          src="/game_build/index.html"
+          title="game"
+          width="100%"
+          height="100%"
+        ></iframe>
 
-      <ContextMenu
-        open={contextMenu.open}
-        anchorPosition={contextMenu.anchorPosition}
-        onClose={() => setContextMenu({ ...contextMenu, open: false })}
-        onGoTo={handleGoTo}
-        actions={actions}
-      />
-    </Box>
+        <ContextMenu
+          open={contextMenu.open}
+          anchorPosition={contextMenu.anchorPosition}
+          onClose={() => setContextMenu({ ...contextMenu, open: false })}
+          onGoTo={handleGoTo}
+          actions={actions}
+        />
+      </Box>
+      <Stack sx={{ flex: "0 0 24rem" }}>
+        <Box sx={{ m: 2 }}>
+          <h1>Godot React Integration</h1>
+          <p>
+            This is an example of how you can integrate a Godot game with a
+            React app.
+          </p>
+          <p>
+            Drag the screen to move the camera. Right click to see the context
+            menu.
+          </p>
+        </Box>
+
+        <Box
+          sx={{
+            m: 4,
+          }}
+        >
+          <InputLabel id="player-speed">Player Speed</InputLabel>
+          <Slider
+            aria-label="Player Speed"
+            value={playerSpeed}
+            onChange={(_, value) => setPlayerSpeed(value as number)}
+            min={1}
+            max={10}
+            valueLabelDisplay="auto"
+          />
+        </Box>
+      </Stack>
+    </Stack>
   );
 }
 
