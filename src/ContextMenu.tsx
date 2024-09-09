@@ -8,6 +8,7 @@ interface ContextMenuProps {
   anchorPosition: { top: number; left: number } | null;
   onClose: () => void;
   onGoTo: (x: number, y: number, z: number) => void;
+  onPickUp: (id: string) => void;
   actions: Action[];
 }
 
@@ -16,8 +17,10 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
   anchorPosition,
   onClose,
   onGoTo,
+  onPickUp: handlePickUp,
   actions,
 }) => {
+  console.log(actions);
   return (
     <Menu
       open={open}
@@ -38,6 +41,18 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
               >
                 Go to {action.point.x.toFixed(2)}, {action.point.y.toFixed(2)},{" "}
                 {action.point.z.toFixed(2)}
+              </MenuItem>
+            );
+          case "pick_up":
+            return (
+              <MenuItem
+                key={index}
+                onClick={() => {
+                  handlePickUp(action.id);
+                  onClose();
+                }}
+              >
+                Pick up {action.id}
               </MenuItem>
             );
           default:

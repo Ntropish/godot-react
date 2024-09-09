@@ -1,10 +1,12 @@
 import { useRef, useEffect, useState } from "react";
 
-import { Box, Stack, Slider, InputLabel } from "@mui/material";
+import { Box, Stack, Slider, InputLabel, Divider } from "@mui/material";
 import "./App.css";
 import ContextMenu from "./ContextMenu";
 
 import { Action } from "./schema";
+import { useInventoryStore } from "./inventoryStore";
+import { useGameStore } from "./gameStore";
 
 function App() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -16,6 +18,11 @@ function App() {
     open: false,
     anchorPosition: null,
   });
+
+  const rootBeers = useInventoryStore((state) => state.rootBeers);
+  const addToInventory = useInventoryStore((state) => state.addToInventory);
+
+  const cameraLocation = useGameStore((state) => state.cameraLocation);
 
   const [actions, setActions] = useState<Action[]>([]);
 
@@ -74,6 +81,18 @@ function App() {
             left: event.data.screen_point.x / 1.5,
           },
         });
+      } else if (event.data.type === "godot_onpickup") {
+        const objectType = event.data.object_type;
+        if (objectType === "ROOT_BEER") {
+          addToInventory({
+            name: "ROOT_BEER",
+            quantity: 1,
+          });
+        }
+      } else if (event.data.type === "godot_camera_position_update") {
+        const { x, y, z } = event.data.position;
+
+        useGameStore.setState({ cameraLocation: { x, y, z } });
       }
     };
 
@@ -82,7 +101,7 @@ function App() {
     return () => {
       window.removeEventListener("message", handleMessage);
     };
-  }, []);
+  }, [setActions, setContextMenu, addToInventory]);
 
   const handleGoTo = (x: number, y: number, z: number) => {
     const iframe = iframeRef.current;
@@ -100,6 +119,22 @@ function App() {
     iframeWindow.postMessage(serializedMessage, "*");
   };
 
+  const handlePickUp = (id: string) => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    const iframeWindow = iframe.contentWindow;
+    if (!iframeWindow) return;
+
+    const message = {
+      type: "godot_pick_up",
+      payload: id,
+    };
+
+    const serializedMessage = JSON.stringify(message);
+    iframeWindow.postMessage(serializedMessage, "*");
+  };
+
   const gameUrl = "/godot-react/game_build/index.html";
 
   return (
@@ -110,6 +145,13 @@ function App() {
         overflow: "hidden",
       }}
       direction="row"
+      divider={
+        <Divider
+          orientation="vertical"
+          flexItem
+          sx={{ backgroundColor: "rgba(0, 0, 0, 0.12)" }}
+        />
+      }
     >
       <Box
         onContextMenu={(e) => e.preventDefault()}
@@ -121,6 +163,9 @@ function App() {
           ref={iframeRef}
           style={{ border: "none" }}
           // Have to add the base path here
+          data-initial-camera-position={
+            cameraLocation ? JSON.stringify(cameraLocation) : undefined
+          }
           src={gameUrl}
           title="game"
           width="100%"
@@ -132,16 +177,15 @@ function App() {
           anchorPosition={contextMenu.anchorPosition}
           onClose={() => setContextMenu({ ...contextMenu, open: false })}
           onGoTo={handleGoTo}
+          onPickUp={handlePickUp}
           actions={actions}
         />
       </Box>
+
       <Stack sx={{ flex: "0 0 24rem" }}>
         <Box sx={{ m: 2 }}>
           <h1>Godot React Integration</h1>
-          <p>
-            This is an example of how you can integrate a Godot game with a
-            React app.
-          </p>
+
           <p>
             Drag the screen to move the camera. Right click to see the context
             menu.
@@ -162,6 +206,15 @@ function App() {
             max={10}
             valueLabelDisplay="auto"
           />
+        </Box>
+
+        <Box
+          sx={{
+            m: 4,
+          }}
+        >
+          <h2>Inventory</h2>
+          <p>Root Beers: {rootBeers}</p>
         </Box>
       </Stack>
     </Stack>
