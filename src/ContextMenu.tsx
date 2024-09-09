@@ -27,6 +27,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
       onClose={onClose}
       anchorReference="anchorPosition"
       anchorPosition={anchorPosition ?? undefined}
+      transitionDuration={0}
     >
       {actions.map((action, index) => {
         switch (action.action) {
