@@ -1,12 +1,20 @@
 import { useRef, useEffect, useState } from "react";
 
-import { Box, Stack, Slider, InputLabel, Divider } from "@mui/material";
+import {
+  Box,
+  Stack,
+  Divider,
+  Typography,
+  Button,
+  LinearProgress,
+} from "@mui/material";
 import "./App.css";
 import ContextMenu from "./ContextMenu";
 
 import { Action } from "./schema";
 import { useInventoryStore } from "./inventoryStore";
 import { useGameStore } from "./gameStore";
+import { useGame } from "./useGame";
 
 function App() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -19,31 +27,27 @@ function App() {
     anchorPosition: null,
   });
 
-  const rootBeers = useInventoryStore((state) => state.rootBeers);
+  useGame(iframeRef);
+
+  const rootBeers = useGameStore((state) => state.rootBeers);
+  const weiners = useGameStore((state) => state.weiners);
+  const burgers = useGameStore((state) => state.burgers);
+
+  const glucose = useGameStore((state) => state.glucose);
+
+  const speed = useGameStore((state) => state.speed);
+  const weight = useGameStore((state) => state.weight);
+
+  const hunger = useGameStore((state) => state.hunger);
+  const thirst = useGameStore((state) => state.thirst);
+  const walkingSkill = useGameStore((state) => state.walkingSkill);
+  const carryingSkill = useGameStore((state) => state.carryingSkill);
+
   const addToInventory = useInventoryStore((state) => state.addToInventory);
 
   const cameraLocation = useGameStore((state) => state.cameraLocation);
 
   const [actions, setActions] = useState<Action[]>([]);
-
-  const [playerSpeed, setPlayerSpeed] = useState(5);
-
-  useEffect(() => {
-    const iframe = iframeRef.current;
-    if (!iframe) return;
-
-    const iframeWindow = iframe.contentWindow;
-    if (!iframeWindow) return;
-
-    const message = {
-      type: "godot_set_player_speed",
-      payload: playerSpeed,
-    };
-
-    const serializedMessage = JSON.stringify(message);
-
-    iframeWindow.postMessage(serializedMessage, "*");
-  }, [playerSpeed]);
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -83,16 +87,35 @@ function App() {
         });
       } else if (event.data.type === "godot_onpickup") {
         const objectType = event.data.object_type;
+        const quantity = event.data.quantity || 1;
+
         if (objectType === "ROOT_BEER") {
-          addToInventory({
-            name: "ROOT_BEER",
-            quantity: 1,
-          });
+          useGameStore.setState((state) => ({
+            rootBeers: state.rootBeers + quantity,
+          }));
+        } else if (objectType === "WEINER") {
+          useGameStore.setState((state) => ({
+            weiners: state.weiners + quantity,
+          }));
+        } else if (objectType === "BURGER") {
+          useGameStore.setState((state) => ({
+            burgers: state.burgers + quantity,
+          }));
         }
       } else if (event.data.type === "godot_camera_position_update") {
         const { x, y, z } = event.data.position;
 
         useGameStore.setState({ cameraLocation: { x, y, z } });
+      } else if (event.data.type === "godot_location_update") {
+        const { x, y, z } = event.data.position;
+
+        useGameStore.setState({ location: { x, y, z } });
+      } else if (event.data.type === "godot_travel") {
+        const distance = event.data.distance;
+
+        useGameStore.setState((state) => ({
+          glucose: state.glucose - distance * 0.1,
+        }));
       }
     };
 
@@ -183,30 +206,15 @@ function App() {
       </Box>
 
       <Stack sx={{ flex: "0 0 24rem" }}>
+        <p>Drag the screen to move the camera</p>
+        <p>Right click to act</p>
+        <Divider />
         <Box sx={{ m: 2 }}>
-          <h1>Godot React Integration</h1>
-
-          <p>
-            Drag the screen to move the camera. Right click to see the context
-            menu.
-          </p>
+          <Typography variant="h4" sx={{ fontWeight: 300 }}>
+            Cookout Creek
+          </Typography>
         </Box>
-
-        <Box
-          sx={{
-            m: 4,
-          }}
-        >
-          <InputLabel id="player-speed">Player Speed</InputLabel>
-          <Slider
-            aria-label="Player Speed"
-            value={playerSpeed}
-            onChange={(_, value) => setPlayerSpeed(value as number)}
-            min={1}
-            max={10}
-            valueLabelDisplay="auto"
-          />
-        </Box>
+        <Divider />
 
         <Box
           sx={{
@@ -214,7 +222,153 @@ function App() {
           }}
         >
           <h2>Inventory</h2>
-          <p>Root Beers: {rootBeers}</p>
+          {/* <p>Root Beers: {rootBeers}</p> */}
+          <Stack direction="row" alignItems={"center"}>
+            <Typography
+              sx={{
+                flexBasis: "10rem",
+              }}
+            >
+              Root Beers
+            </Typography>
+            <Typography
+              sx={{
+                flexBasis: "5rem",
+              }}
+            >
+              {rootBeers}
+            </Typography>
+            <Button
+              onClick={() => {
+                useGameStore.setState((state) => ({
+                  rootBeers: state.rootBeers - 1,
+                  thirst: state.thirst - 10,
+                }));
+              }}
+            >
+              Drink
+            </Button>
+          </Stack>
+          {/* <p>Weiners: {weiners}</p> */}
+          <Stack direction="row">
+            <Typography
+              sx={{
+                flexBasis: "10rem",
+              }}
+            >
+              Weiners
+            </Typography>
+            <Typography
+              sx={{
+                flexBasis: "5rem",
+              }}
+            >
+              {weiners}
+            </Typography>
+            <Button
+              onClick={() => {
+                useGameStore.setState((state) => ({
+                  weiners: state.weiners - 1,
+                  hunger: state.hunger - 10,
+                }));
+              }}
+            >
+              Eat
+            </Button>
+          </Stack>
+          {/* <p>Burgers: {burgers}</p> */}
+          <Stack direction="row">
+            <Typography
+              sx={{
+                flexBasis: "10rem",
+              }}
+            >
+              Burgers
+            </Typography>
+            <Typography
+              sx={{
+                flexBasis: "5rem",
+              }}
+            >
+              {burgers}
+            </Typography>
+            <Button
+              disabled={burgers < 1 || hunger < 20}
+              onClick={() => {
+                useGameStore.setState((state) => ({
+                  burgers: state.burgers - 1,
+                  hunger: state.hunger - 20,
+                }));
+              }}
+            >
+              Eat
+            </Button>
+          </Stack>
+
+          <h2>Stats</h2>
+          {/* <p>Hunger: {hunger}</p> */}
+          <Stack direction="row" alignItems={"center"}>
+            <Typography variant="caption" flexBasis="10rem">
+              Hunger
+            </Typography>
+
+            <LinearProgress
+              variant="determinate"
+              value={hunger}
+              sx={{ width: "100%" }}
+            />
+          </Stack>
+          {/* <p>Thirst: {thirst}</p>
+           */}
+          <Stack direction="row" alignItems={"center"}>
+            <Typography variant="caption" flexBasis="10rem">
+              Thirst
+            </Typography>
+
+            <LinearProgress
+              variant="determinate"
+              value={thirst}
+              sx={{ width: "100%" }}
+            />
+          </Stack>
+          {/* <p>Speed: {speed}</p> */}
+          <Stack direction="row" alignItems={"center"}>
+            <Typography variant="caption" flexBasis="10rem">
+              Speed
+            </Typography>
+
+            <LinearProgress
+              variant="determinate"
+              value={(speed * 100) / 10}
+              sx={{ width: "100%" }}
+            />
+          </Stack>
+          <p>Weight: {weight}</p>
+
+          <h2>Skills</h2>
+          {/* <p>Walking Skill: {walkingSkill}</p> */}
+          {/* <p>Carrying Skill: {carryingSkill}</p> */}
+          <Stack direction="row" alignItems={"center"} sx={{}}>
+            <Typography variant="caption" sx={{ flexBasis: "10rem" }}>
+              Walking
+            </Typography>
+            <LinearProgress
+              variant="determinate"
+              value={walkingSkill}
+              sx={{ width: "100%" }}
+            ></LinearProgress>
+          </Stack>
+
+          <Stack direction="row" alignItems={"center"}>
+            <Typography variant="caption" sx={{ flexBasis: "10rem" }}>
+              Carrying
+            </Typography>
+            <LinearProgress
+              variant="determinate"
+              value={carryingSkill}
+              sx={{ width: "100%" }}
+            ></LinearProgress>
+          </Stack>
         </Box>
       </Stack>
     </Stack>
