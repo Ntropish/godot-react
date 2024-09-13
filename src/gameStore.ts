@@ -2,21 +2,7 @@ import { create } from "zustand";
 
 import { persist } from "zustand/middleware";
 
-interface GameState {
-  rootBeers: number;
-  weiners: number;
-  burgers: number;
-  hunger: number;
-  thirst: number;
-  glucose: number;
-  speed: number;
-  weight: number;
-  walkingSkill: number;
-  carryingSkill: number;
-  location: { x: number; y: number; z: number } | null;
-  cameraLocation: { x: number; y: number; z: number } | null;
-  scene: string;
-}
+import { GameState } from "./schema";
 
 const useGameStore = create<GameState>()(
   persist(

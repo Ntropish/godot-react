@@ -33,8 +33,6 @@ function App() {
   const weiners = useGameStore((state) => state.weiners);
   const burgers = useGameStore((state) => state.burgers);
 
-  const glucose = useGameStore((state) => state.glucose);
-
   const speed = useGameStore((state) => state.speed);
   const weight = useGameStore((state) => state.weight);
 
@@ -222,7 +220,8 @@ function App() {
           }}
         >
           <h2>Inventory</h2>
-          {/* <p>Root Beers: {rootBeers}</p> */}
+          <p>Weight: {weight}</p>
+
           <Stack direction="row" alignItems={"center"}>
             <Typography
               sx={{
@@ -239,6 +238,7 @@ function App() {
               {rootBeers}
             </Typography>
             <Button
+              disabled={rootBeers < 1 || thirst < 10}
               onClick={() => {
                 useGameStore.setState((state) => ({
                   rootBeers: state.rootBeers - 1,
@@ -249,7 +249,6 @@ function App() {
               Drink
             </Button>
           </Stack>
-          {/* <p>Weiners: {weiners}</p> */}
           <Stack direction="row">
             <Typography
               sx={{
@@ -266,6 +265,7 @@ function App() {
               {weiners}
             </Typography>
             <Button
+              disabled={weiners < 1 || hunger < 10}
               onClick={() => {
                 useGameStore.setState((state) => ({
                   weiners: state.weiners - 1,
@@ -276,7 +276,6 @@ function App() {
               Eat
             </Button>
           </Stack>
-          {/* <p>Burgers: {burgers}</p> */}
           <Stack direction="row">
             <Typography
               sx={{
@@ -343,7 +342,6 @@ function App() {
               sx={{ width: "100%" }}
             />
           </Stack>
-          <p>Weight: {weight}</p>
 
           <h2>Skills</h2>
           {/* <p>Walking Skill: {walkingSkill}</p> */}
