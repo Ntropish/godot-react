@@ -10,7 +10,6 @@ export function useGame(iframeRef: React.RefObject<HTMLIFrameElement>) {
       new URL("./gameWorker.js", import.meta.url)
     );
     const port = worker.port;
-    port.start();
     portRef.current = port;
 
     port.onmessage = (event) => {
@@ -43,4 +42,13 @@ export function useGame(iframeRef: React.RefObject<HTMLIFrameElement>) {
     const serializedMessage = JSON.stringify(message);
     iframeWindow.postMessage(serializedMessage, "*");
   }, [playerSpeed, iframeRef]);
+
+  // Expose a function to send messages to the worker
+  const sendActionToWorker = (actionType: string, payload?: any) => {
+    if (portRef.current) {
+      portRef.current.postMessage({ type: actionType, payload });
+    }
+  };
+
+  return { sendActionToWorker };
 }
