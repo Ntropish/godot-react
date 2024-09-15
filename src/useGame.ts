@@ -8,8 +8,6 @@ import {
   TaskConsume,
 } from "./schema";
 import { GameState } from "./schema";
-import { getLevelFromXP } from "./getLevelFromXP";
-import { getLevelProgress } from "./getLevelProgress";
 import { getXPStats } from "./getXPStats";
 import { addXP } from "./addXP";
 
@@ -88,7 +86,6 @@ export function useGame({
     if (!iframeWindow) return;
 
     const handleMessage = (event: MessageEvent) => {
-      console.log("from godot", event.data);
       if (event.source !== iframe.contentWindow) return;
 
       if (event.data.type === "godot_oncontextmenu") {
@@ -263,6 +260,12 @@ export function useGame({
 
   // 1 second tick
   useEffect(() => {
+    // Send the initial player speed
+    sendMessageToGodot({
+      action: "set_player_speed",
+      speed: useGameStore.getState().speed,
+    });
+
     const timer = setInterval(() => {
       const oldState = useGameStore.getState();
       const newState = updateGameState(oldState);
@@ -317,6 +320,8 @@ function updateGameState(oldState: GameState): GameState {
     weiner * weights.weiner +
     burger * weights.burger;
 
+  const maximumCarryWeight = 20 + carryingSkill.level * 5;
+
   const unburdenedWeight = 20 + carryingSkill.level * 10;
 
   const burden = Math.max(0, carriedWeight - unburdenedWeight);
@@ -324,31 +329,22 @@ function updateGameState(oldState: GameState): GameState {
   const carryBurn = burden * 0.01;
   const thirstDelta = 0.001 + carryBurn * 0.0001;
 
-  const hungerDelta = burden * 0.001;
+  const hungerDelta = burden * 0.01;
   const carryingSkillDelta = burden * 0.001;
 
-  // const baseWalkSpeed = 5;
-  // const skillSpeedBoost = 0.1 * walkingSkill.level;
-
-  // const burdenSpeedBurn = 0.5 * burden;
-
-  // const minimumSpeed = 0.5 + 0.01 * walkingSkill.level;
-
-  // const playerSpeed = Math.max(
-  //   minimumSpeed,
-  //   baseWalkSpeed + skillSpeedBoost + quenchedSpeedBoost - burdenSpeedBurn
-  // );
   const quenched = clamp(100 - thirst, 0, 100) / 100;
   const satiated = clamp(100 - hunger, 0, 100) / 100;
 
-  const minimumSpeed = 0.5 + 0.01 * walkingSkill.level;
-
+  const minimumSpeed = 3 + 0.1 * walkingSkill.level;
   const maximumSpeed = 5 + 0.2 * walkingSkill.level;
 
   const speedMultiplier = quenched * satiated;
 
-  const playerSpeed =
-    minimumSpeed + (maximumSpeed - minimumSpeed) * speedMultiplier;
+  let playerSpeed = minimumSpeed / 2;
+  if (carriedWeight < maximumCarryWeight) {
+    playerSpeed =
+      minimumSpeed + (maximumSpeed - minimumSpeed) * speedMultiplier;
+  }
 
   const newCarryingSkill = addXP(carryingSkill, carryingSkillDelta);
 
@@ -362,5 +358,6 @@ function updateGameState(oldState: GameState): GameState {
     minimumSpeed,
     maximumSpeed,
     weight: carriedWeight,
+    maximumCarryWeight,
   };
 }

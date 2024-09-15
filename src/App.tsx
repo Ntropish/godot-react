@@ -8,7 +8,9 @@ import {
   Button,
   LinearProgress,
   Tooltip,
+  IconButton,
 } from "@mui/material";
+import VerticalAlignBottomIcon from "@mui/icons-material/VerticalAlignBottom";
 import "./App.css";
 import ContextMenu from "./ContextMenu";
 
@@ -16,6 +18,8 @@ import { useGameStore } from "./store/gameStore";
 import { useGame } from "./useGame";
 import theme from "./theme";
 import { SkillTooltip } from "./SkillTooltip";
+import { useDropModalStore } from "./store/dropModalStore";
+import { DropModal } from "./DropModal";
 
 function App() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -36,6 +40,7 @@ function App() {
   const maximumSpeed = useGameStore((state) => state.maximumSpeed);
 
   const weight = useGameStore((state) => state.weight);
+  const maximumCarryWeight = useGameStore((state) => state.maximumCarryWeight);
 
   const hunger = useGameStore((state) => state.hunger);
   const thirst = useGameStore((state) => state.thirst);
@@ -43,6 +48,14 @@ function App() {
   const carryingSkill = useGameStore((state) => state.carryingSkill);
 
   const cameraLocation = useGameStore((state) => state.cameraLocation);
+
+  let weightColor = "primary" as "primary" | "secondary" | "error" | "warning";
+  if (weight > maximumCarryWeight) {
+    weightColor = "error";
+  }
+  if (weight / maximumCarryWeight > 0.2) {
+    weightColor = "warning";
+  }
 
   const gameUrl = "/godot-react/game_build/index.html";
 
@@ -116,13 +129,38 @@ function App() {
           }}
         >
           <h2>Inventory</h2>
-          <p>
-            Weight:&nbsp;
-            {Intl.NumberFormat("en-IN", {
-              maximumFractionDigits: 2,
-              minimumFractionDigits: 2,
-            }).format(weight)}
-          </p>
+
+          <Stack direction="column">
+            <Stack
+              direction="row"
+              alignItems={"baseline"}
+              justifyContent={"space-between"}
+            >
+              <Typography>Weight</Typography>
+              <Typography
+                sx={{
+                  fontFamily: "monospace",
+                  textAlign: "right",
+                }}
+              >
+                {Intl.NumberFormat("en-IN", {
+                  maximumFractionDigits: 2,
+                  minimumFractionDigits: 2,
+                }).format(weight)}{" "}
+                /{" "}
+                {Intl.NumberFormat("en-IN", {
+                  maximumFractionDigits: 2,
+                  minimumFractionDigits: 2,
+                }).format(maximumCarryWeight)}
+              </Typography>
+            </Stack>
+            <LinearProgress
+              variant="determinate"
+              value={Math.min((weight / maximumCarryWeight) * 100, 100)}
+              color={weightColor}
+              sx={{ width: "100%" }}
+            />
+          </Stack>
 
           <Stack direction="row" alignItems={"baseline"}>
             <Typography
@@ -152,8 +190,19 @@ function App() {
             >
               Drink
             </Button>
+            <IconButton
+              onClick={() => {
+                useDropModalStore.setState({
+                  dropType: "root_beer",
+                  dropAmount: 1,
+                  dropAmountString: "1",
+                });
+              }}
+            >
+              <VerticalAlignBottomIcon />
+            </IconButton>
           </Stack>
-          <Stack direction="row" alignItems={"baseline"}>
+          <Stack direction="row" alignItems={"center"}>
             <Typography
               sx={{
                 flexBasis: "10rem",
@@ -181,6 +230,17 @@ function App() {
             >
               Eat
             </Button>
+            <IconButton
+              onClick={() => {
+                useDropModalStore.setState({
+                  dropType: "weiner",
+                  dropAmount: 1,
+                  dropAmountString: "1",
+                });
+              }}
+            >
+              <VerticalAlignBottomIcon />
+            </IconButton>
           </Stack>
           <Stack direction="row" alignItems={"baseline"}>
             <Typography
@@ -210,6 +270,17 @@ function App() {
             >
               Eat
             </Button>
+            <IconButton
+              onClick={() => {
+                useDropModalStore.setState({
+                  dropType: "burger",
+                  dropAmount: 1,
+                  dropAmountString: "1",
+                });
+              }}
+            >
+              <VerticalAlignBottomIcon />
+            </IconButton>
           </Stack>
 
           <h2>Stats</h2>
@@ -323,6 +394,7 @@ function App() {
           </Tooltip>
         </Box>
       </Stack>
+      <DropModal />
     </Stack>
   );
 }

@@ -17,11 +17,29 @@ export const useGameStore = create<GameState>()(
 
       /** calculated stats */
       weight: 0,
+      maximumCarryWeight: 20,
+
       speed: 1,
 
+      minimumSpeed: 0,
+      maximumSpeed: 0,
+
+      speedMultiplier: 0,
+
       /** player stats */
-      walkingSkill: 0,
-      carryingSkill: 0,
+      walkingSkill: {
+        xp: 0,
+        level: 1,
+        progress: 0,
+        remainingXP: 100,
+      },
+
+      carryingSkill: {
+        xp: 0,
+        level: 1,
+        progress: 0,
+        remainingXP: 100,
+      },
 
       /** player state */
       location: null,
