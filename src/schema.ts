@@ -1,140 +1,58 @@
 import * as z from "zod";
 
-export const GameStateSchema = z.object({
-  rootBeers: z.number(),
-  weiners: z.number(),
-  burgers: z.number(),
-  hunger: z.number(),
-  thirst: z.number(),
-  speed: z.number(),
-  weight: z.number(),
-  walkingSkill: z.number(),
-  carryingSkill: z.number(),
-  updated_time: z.number().nullable(),
-  location: z
-    .object({
-      x: z.number(),
-      y: z.number(),
-      z: z.number(),
-    })
-    .nullable(),
-  navigateToLocation: z
-    .object({
-      x: z.number(),
-      y: z.number(),
-      z: z.number(),
-    })
-    .nullable(),
-  navigateToObjectId: z.string().nullable(),
-  cameraLocation: z
-    .object({
-      x: z.number(),
-      y: z.number(),
-      z: z.number(),
-    })
-    .nullable(),
-  scene: z.string().nullable(),
+export const Point3Schema = z.object({
+  x: z.number(),
+  y: z.number(),
+  z: z.number(),
 });
 
-export type GameState = z.infer<typeof GameStateSchema>;
+export type Point3 = z.infer<typeof Point3Schema>;
 
-const GotoActionSchema = z.object({
-  type: z.literal("go_to"),
-  payload: z.object({
-    x: z.number(),
-    y: z.number(),
-    z: z.number(),
-  }),
+export const ConsumableSchema = z.union([
+  z.literal("ROOT_BEER"),
+  z.literal("WEINER"),
+  z.literal("BURGER"),
+]);
+
+export type Consumable = z.infer<typeof ConsumableSchema>;
+
+/** The character can engage in one task at a time. */
+
+export const TaskGoToPointSchema = z.object({
+  type: z.literal("go_to_point"),
+  point: Point3Schema,
 });
 
-export type GotoAction = z.infer<typeof GotoActionSchema>;
+export type TaskGoToPoint = z.infer<typeof TaskGoToPointSchema>;
 
-const PickUpDescriptionSchema = z.object({
-  type: z.union([
-    z.literal("BURGER"),
-    z.literal("WEINER"),
-    z.literal("ROOT_BEER"),
-  ]),
-  quantity: z.number(),
+export const TaskGoToObjectSchema = z.object({
+  type: z.literal("go_to_object"),
+  object: z.string(),
 });
 
-export type PickUpDescription = z.infer<typeof PickUpDescriptionSchema>;
+export type TaskGoToObject = z.infer<typeof TaskGoToObjectSchema>;
 
-const PickUpActionSchema = z.object({
+export const TaskPickUpSchema = z.object({
   type: z.literal("pick_up"),
-  payload: PickUpDescriptionSchema,
+  object: z.string(),
 });
 
-export type PickUpAction = z.infer<typeof PickUpActionSchema>;
+export type TaskPickUp = z.infer<typeof TaskPickUpSchema>;
 
-const EatBurgerMessageSchema = z.object({
-  type: z.literal("eat_burger"),
-  payload: z.number().optional(),
+export const TaskConsumeSchema = z.object({
+  type: z.literal("consume"),
+  consumable: ConsumableSchema,
+  amount: z.number(),
 });
 
-export type EatBurgerMessage = z.infer<typeof EatBurgerMessageSchema>;
-
-const EatWeinerMessageSchema = z.object({
-  type: z.literal("eat_weiner"),
-  payload: z.number().optional(),
-});
-
-export type EatWeinerMessage = z.infer<typeof EatWeinerMessageSchema>;
-
-const DrinkRootBeerMessageSchema = z.object({
-  type: z.literal("drink_root_beer"),
-  payload: z.number().optional(),
-});
-
-export type DrinkRootBeerMessage = z.infer<typeof DrinkRootBeerMessageSchema>;
-
-const UpdateStateMessageSchema = z.object({
-  type: z.literal("update_state"),
-  payload: GameStateSchema,
-});
-
-export type UpdateStateMessage = z.infer<typeof UpdateStateMessageSchema>;
-
-export const ActionMessageSchema = z.union([
-  GotoActionSchema,
-  PickUpActionSchema,
-  EatBurgerMessageSchema,
-  EatWeinerMessageSchema,
-  DrinkRootBeerMessageSchema,
-  UpdateStateMessageSchema,
+export const TaskSchema = z.union([
+  TaskGoToPointSchema,
+  TaskGoToObjectSchema,
+  TaskPickUpSchema,
+  TaskConsumeSchema,
 ]);
 
-export type ActionMessage = z.infer<typeof ActionMessageSchema>;
-
-const UpdateMessageSchema = z.object({
-  type: z.literal("update"),
-  payload: GameStateSchema,
-});
-
-const InitialStateMessageSchema = z.object({
-  type: z.literal("initial_state"),
-  payload: GameStateSchema,
-});
-
-export const WorkerMessageSchema = z.union([
-  UpdateMessageSchema,
-  InitialStateMessageSchema,
-]);
-
-export type WorkerMessage = z.infer<typeof WorkerMessageSchema>;
-
-// {
-//   "action": "pick_up",
-//   "id": hover_controller.current_hover_target.get_instance_id()
-// }
-
-// {
-// "action": "go_to",
-// "point": {
-//   "x": closest_point_on_navmesh.x,
-//   "y": closest_point_on_navmesh.y,
-//   "z": closest_point_on_navmesh.z
-// }
+export type Task = z.infer<typeof TaskSchema>;
 
 // Define Godot context menu actions
 const GodotPickupActionSchema = z.object({
@@ -143,17 +61,57 @@ const GodotPickupActionSchema = z.object({
 });
 
 const GodotGotoActionSchema = z.object({
-  action: z.literal("go_to"),
-  point: z.object({
-    x: z.number(),
-    y: z.number(),
-    z: z.number(),
-  }),
+  action: z.literal("go_to_point"),
+  point: Point3Schema,
+});
+
+const GodotSetPlayerSpeed = z.object({
+  action: z.literal("set_player_speed"),
+  speed: z.number(),
+});
+
+const GodotConsumeSchema = z.object({
+  action: z.literal("consume_consumable"),
+  consumable: ConsumableSchema,
+  amount: z.number(),
+  time_remaining: z.number(),
 });
 
 export const GodotActionSchema = z.union([
   GodotPickupActionSchema,
   GodotGotoActionSchema,
+  GodotSetPlayerSpeed,
+  GodotConsumeSchema,
 ]);
 
 export type GodotAction = z.infer<typeof GodotActionSchema>;
+
+// Define Godot context menu actions
+
+export const GodotContextActionSchema = z.union([
+  GodotPickupActionSchema,
+  GodotGotoActionSchema,
+]);
+
+export type GodotContextAction = z.infer<typeof GodotContextActionSchema>;
+
+/**
+ *
+ */
+export const GameStateSchema = z.object({
+  root_beer: z.number(),
+  weiner: z.number(),
+  burger: z.number(),
+  hunger: z.number(),
+  thirst: z.number(),
+  speed: z.number(),
+  weight: z.number(),
+  walkingSkill: z.number(),
+  carryingSkill: z.number(),
+  location: Point3Schema.nullable(),
+  task: TaskSchema.nullable(),
+  cameraLocation: Point3Schema.nullable(),
+  scene: z.string().nullable(),
+});
+
+export type GameState = z.infer<typeof GameStateSchema>;

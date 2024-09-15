@@ -1,15 +1,15 @@
 import React from "react";
 import { Menu, MenuItem } from "@mui/material";
 
-import { Action } from "./schema";
+import { GodotAction, Point3 } from "./schema";
 
 interface ContextMenuProps {
   open: boolean;
   anchorPosition: { top: number; left: number } | null;
   onClose: () => void;
-  onGoTo: (x: number, y: number, z: number) => void;
+  onGoTo: (point: Point3) => void;
   onPickUp: (id: string) => void;
-  actions: Action[];
+  actions: GodotAction[];
 }
 
 const ContextMenu: React.FC<ContextMenuProps> = ({
@@ -30,12 +30,12 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
     >
       {actions.map((action, index) => {
         switch (action.action) {
-          case "go_to":
+          case "go_to_point":
             return (
               <MenuItem
                 key={index}
                 onClick={() => {
-                  onGoTo(action.point.x, action.point.y, action.point.z);
+                  onGoTo(action.point);
                   onClose();
                 }}
               >

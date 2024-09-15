@@ -1,80 +1,189 @@
-import { useEffect, useRef, useCallback } from "react";
-import { useGameStore } from "./gameStore";
-import { ActionMessage, WorkerMessageSchema, WorkerMessage } from "./schema";
+import { useEffect, useCallback, useMemo } from "react";
+import { useGameStore } from "./store/gameStore";
+import { Consumable, GodotAction, Point3 } from "./schema";
+import { GameState } from "./schema";
 
-export function useGame(iframeRef: React.RefObject<HTMLIFrameElement>) {
-  const portRef = useRef<MessagePort | null>(null);
-  const updatePlayerSpeed = useCallback(
-    function updatePlayerSpeed(speed: number) {
-      const iframe = iframeRef.current;
-      if (iframe) {
-        const iframeWindow = iframe.contentWindow;
-        if (iframeWindow) {
-          const speedMessage = {
-            type: "godot_set_player_speed",
-            payload: speed,
-          };
-          const serializedMessage = JSON.stringify(speedMessage);
-          iframeWindow.postMessage(serializedMessage, "*");
-        }
-      }
+const weights = {
+  root_beer: 1.5,
+  weiner: 1,
+  burger: 1,
+};
+
+const consumption_rates = {
+  root_beer: 10,
+  weiner: 5,
+  burger: 15,
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+export function useGame({
+  sendMessageToGodot,
+}: {
+  sendMessageToGodot: (message: GodotAction) => void;
+}) {
+  // These functions set a task for the character
+  const goToPoint = useCallback(
+    (point: Point3) => {
+      useGameStore.setState((state: GameState) => ({
+        ...state,
+        task: {
+          type: "go_to_point",
+          point,
+        },
+      }));
+      sendMessageToGodot({
+        action: "go_to_point",
+        point,
+      });
     },
-    [iframeRef]
+    [sendMessageToGodot]
   );
 
-  // Function to handle messages from the worker
-  const handleWorkerMessage = useCallback(
-    function handleWorkerMessage(message: WorkerMessage) {
-      console.log("got message", message);
-      switch (message.type) {
-        case "update":
-        case "initial_state":
-          console.log("got update", message.payload);
-          // Update the Zustand store with the new game state
-          useGameStore.setState(message.payload);
+  const goToObject = useCallback((id: string) => {
+    useGameStore.setState((state: GameState) => ({
+      ...state,
+      task: {
+        type: "go_to_object",
+        object: id,
+      },
+    }));
+  }, []);
 
-          // Update the player speed in the iframe
-          updatePlayerSpeed(message.payload.speed);
-          break;
-        default:
-          console.error("Unknown message type from worker");
-      }
+  const pickUp = useCallback(
+    (id: string) => {
+      useGameStore.setState((state: GameState) => ({
+        ...state,
+        task: {
+          type: "pick_up",
+          object: id,
+        },
+      }));
+      sendMessageToGodot({
+        action: "pick_up",
+        id,
+      });
     },
-    [updatePlayerSpeed]
+    [sendMessageToGodot]
   );
+
+  const consume = useCallback(
+    (consumable: Consumable, maxAdditionalAmount: number) => {
+      const currentState = useGameStore.getState();
+      const currentAmount = currentState[consumable];
+
+      let amount = Math.min(maxAdditionalAmount, currentAmount);
+
+      // if the character is already consuming, add to the amount
+      if (
+        currentState.task?.type === "consume" &&
+        currentState.task.consumable === consumable
+      ) {
+        amount += currentState.task.amount;
+      }
+
+      useGameStore.setState((state: GameState) => ({
+        ...state,
+        task: {
+          type: "consume",
+          consumable,
+          amount,
+        },
+      }));
+
+      sendMessageToGodot({
+        action: "consume_consumable",
+        consumable,
+        amount,
+        time_remaining: consumption_rates[consumable] * amount,
+      });
+
+      return amount;
+    },
+    [sendMessageToGodot]
+  );
+
+  // 1 second tick
   useEffect(() => {
-    const worker = new SharedWorker(
-      new URL("./worker/gameWorker.ts", import.meta.url),
-      {
-        name: "gameWorker",
-        type: "module",
+    const timer = setInterval(() => {
+      const oldState = useGameStore.getState();
+      const newState = updateGameState(oldState);
+
+      if (oldState.speed !== newState.speed) {
+        sendMessageToGodot({
+          action: "set_player_speed",
+          speed: newState.speed,
+        });
       }
-    );
+      useGameStore.setState(newState);
+    }, 1000);
 
-    const port = worker.port;
-    port.start();
-    portRef.current = port;
+    return () => clearInterval(timer);
+  }, [sendMessageToGodot]);
 
-    port.addEventListener("message", (event) => {
-      try {
-        const message = WorkerMessageSchema.parse(event.data);
-        handleWorkerMessage(message);
-      } catch (error) {
-        console.error("Invalid message received from worker:", error);
-      }
-    });
-
-    return () => {
-      port.close();
+  return useMemo(() => {
+    return {
+      goToPoint,
+      goToObject,
+      pickUp,
+      consume,
     };
-  }, [handleWorkerMessage]);
+  }, [goToPoint, goToObject, pickUp, consume]);
+}
 
-  const sendActionToWorker = (action: ActionMessage) => {
-    const port = portRef.current;
-    if (port) {
-      port.postMessage(action);
-    }
+// One second tick update
+function updateGameState(oldState: GameState): GameState {
+  const {
+    root_beer,
+    weiner,
+    burger,
+    hunger,
+    thirst,
+    walkingSkill,
+    carryingSkill,
+  } = oldState;
+
+  const carriedWeight =
+    root_beer * weights.root_beer +
+    weiner * weights.weiner +
+    burger * weights.burger;
+
+  const unburdenedWeight = 20 + carryingSkill * 10;
+
+  const burden = Math.max(0, carriedWeight - unburdenedWeight);
+
+  const metabolism = clamp(100 - hunger, 1, 100);
+
+  const carryBurn = burden * 0.01;
+  const thirstDelta = 0.001 + carryBurn * 0.0001;
+
+  const hungerDelta = metabolism * 0.001;
+
+  const carryingSkillDelta = carryBurn * 0.1;
+
+  const baseWalkSpeed = 5;
+  const skillSpeedBoost = 0.1 * walkingSkill;
+  const quenchedSpeedBoost = (clamp(30 - thirst, 0, 100) / 30) * 3;
+  const burdenSpeedBurn = 0.1 * burden;
+  const metabolismFactor = metabolism / 100;
+
+  const minimumSpeed = 0.5 + 0.01 * walkingSkill;
+
+  const playerSpeed = Math.max(
+    minimumSpeed,
+    metabolismFactor * (baseWalkSpeed + skillSpeedBoost) +
+      quenchedSpeedBoost -
+      burdenSpeedBurn
+  );
+
+  return {
+    ...oldState,
+    hunger: clamp(hunger + hungerDelta, 0, 100),
+    thirst: clamp(thirst + thirstDelta, 0, 100),
+    carryingSkill: Math.max(0, carryingSkill + carryingSkillDelta),
+    speed: playerSpeed,
+    weight: carriedWeight,
   };
-
-  return { sendActionToWorker };
 }

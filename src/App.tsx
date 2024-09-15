@@ -12,9 +12,8 @@ import {
 import "./App.css";
 import ContextMenu from "./ContextMenu";
 
-import { GodotContextAction } from "./schema";
-import { useInventoryStore } from "./inventoryStore";
-import { useGameStore } from "./gameStore";
+import { GodotAction, GodotContextAction } from "./schema";
+import { useGameStore } from "./store/gameStore";
 import { useGame } from "./useGame";
 
 function App() {
@@ -28,11 +27,22 @@ function App() {
     anchorPosition: null,
   });
 
-  const { sendActionToWorker } = useGame(iframeRef);
+  const sendMessageToGodot = (message: GodotAction) => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
 
-  const rootBeers = useGameStore((state) => state.rootBeers);
-  const weiners = useGameStore((state) => state.weiners);
-  const burgers = useGameStore((state) => state.burgers);
+    const iframeWindow = iframe.contentWindow;
+    if (!iframeWindow) return;
+
+    const serializedMessage = JSON.stringify(message);
+    iframeWindow.postMessage(serializedMessage, "*");
+  };
+
+  const { goToPoint, consume, pickUp } = useGame({ sendMessageToGodot });
+
+  const rootBeers = useGameStore((state) => state.root_beer);
+  const weiners = useGameStore((state) => state.weiner);
+  const burgers = useGameStore((state) => state.burger);
 
   const speed = useGameStore((state) => state.speed);
   const weight = useGameStore((state) => state.weight);
@@ -41,8 +51,6 @@ function App() {
   const thirst = useGameStore((state) => state.thirst);
   const walkingSkill = useGameStore((state) => state.walkingSkill);
   const carryingSkill = useGameStore((state) => state.carryingSkill);
-
-  const addToInventory = useInventoryStore((state) => state.addToInventory);
 
   const cameraLocation = useGameStore((state) => state.cameraLocation);
 
@@ -72,40 +80,17 @@ function App() {
         const quantity = event.data.quantity || 1;
 
         if (objectType === "ROOT_BEER") {
-          // useGameStore.setState((state) => ({
-          //   rootBeers: state.rootBeers + quantity,
-          // }));
-          sendActionToWorker({
-            type: "pick_up",
-            payload: {
-              type: "ROOT_BEER",
-              quantity,
-            },
-          });
+          useGameStore.setState((state) => ({
+            root_beer: state.root_beer + quantity,
+          }));
         } else if (objectType === "WEINER") {
-          // useGameStore.setState((state) => ({
-          //   weiners: state.weiners + quantity,
-          // }));
-
-          sendActionToWorker({
-            type: "pick_up",
-            payload: {
-              type: "WEINER",
-              quantity,
-            },
-          });
+          useGameStore.setState((state) => ({
+            weiner: state.weiner + quantity,
+          }));
         } else if (objectType === "BURGER") {
-          // useGameStore.setState((state) => ({
-          //   burgers: state.burgers + quantity,
-          // }));
-
-          sendActionToWorker({
-            type: "pick_up",
-            payload: {
-              type: "BURGER",
-              quantity,
-            },
-          });
+          useGameStore.setState((state) => ({
+            burger: state.burger + quantity,
+          }));
         }
       } else if (event.data.type === "godot_camera_position_update") {
         const { x, y, z } = event.data.position;
@@ -128,39 +113,7 @@ function App() {
     return () => {
       window.removeEventListener("message", handleMessage);
     };
-  }, [setActions, setContextMenu, addToInventory, sendActionToWorker]);
-
-  const handleGoTo = (x: number, y: number, z: number) => {
-    const iframe = iframeRef.current;
-    if (!iframe) return;
-
-    const iframeWindow = iframe.contentWindow;
-    if (!iframeWindow) return;
-
-    const message = {
-      type: "godot_go_to",
-      payload: { x, y, z },
-    };
-
-    const serializedMessage = JSON.stringify(message);
-    iframeWindow.postMessage(serializedMessage, "*");
-  };
-
-  const handlePickUp = (id: string) => {
-    const iframe = iframeRef.current;
-    if (!iframe) return;
-
-    const iframeWindow = iframe.contentWindow;
-    if (!iframeWindow) return;
-
-    const message = {
-      type: "godot_pick_up",
-      payload: id,
-    };
-
-    const serializedMessage = JSON.stringify(message);
-    iframeWindow.postMessage(serializedMessage, "*");
-  };
+  }, [setActions, setContextMenu]);
 
   const gameUrl = "/godot-react/game_build/index.html";
 
@@ -203,8 +156,8 @@ function App() {
           open={contextMenu.open}
           anchorPosition={contextMenu.anchorPosition}
           onClose={() => setContextMenu({ ...contextMenu, open: false })}
-          onGoTo={handleGoTo}
-          onPickUp={handlePickUp}
+          onGoTo={goToPoint}
+          onPickUp={pickUp}
           actions={actions}
         />
       </Box>
@@ -244,17 +197,9 @@ function App() {
               {rootBeers}
             </Typography>
             <Button
-              disabled={rootBeers < 1 || thirst < 10}
+              disabled={rootBeers <= 0 || thirst < 1}
               onClick={() => {
-                // useGameStore.setState((state) => ({
-                //   rootBeers: state.rootBeers - 1,
-                //   thirst: state.thirst - 10,
-                // }));
-
-                sendActionToWorker({
-                  type: "drink_root_beer",
-                  payload: 1,
-                });
+                consume("ROOT_BEER", 1);
               }}
             >
               Drink
@@ -276,17 +221,9 @@ function App() {
               {weiners}
             </Typography>
             <Button
-              disabled={weiners < 1 || hunger < 10}
+              disabled={weiners <= 0 || hunger < 1}
               onClick={() => {
-                // useGameStore.setState((state) => ({
-                //   weiners: state.weiners - 1,
-                //   hunger: state.hunger - 10,
-                // }));
-
-                sendActionToWorker({
-                  type: "eat_weiner",
-                  payload: 1,
-                });
+                consume("WEINER", 1);
               }}
             >
               Eat
@@ -308,16 +245,9 @@ function App() {
               {burgers}
             </Typography>
             <Button
-              disabled={burgers < 1 || hunger < 20}
+              disabled={burgers <= 0 || hunger < 1}
               onClick={() => {
-                // useGameStore.setState((state) => ({
-                //   burgers: state.burgers - 1,
-                //   hunger: state.hunger - 20,
-                // }));
-                sendActionToWorker({
-                  type: "eat_burger",
-                  payload: 1,
-                });
+                consume("BURGER", 1);
               }}
             >
               Eat
