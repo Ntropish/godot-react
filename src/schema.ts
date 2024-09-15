@@ -1,28 +1,16 @@
 import * as z from "zod";
 
-// export type GotoAction = {
-//   type: "go_to";
-//   payload: { x: number; y: number; z: number };
-// };
-
-// export type PickUpAction = {
-//   type: "pick_up";
-//   // the id of the item to pick up
-//   payload: string;
-// };
-
 export const GameStateSchema = z.object({
   rootBeers: z.number(),
   weiners: z.number(),
   burgers: z.number(),
   hunger: z.number(),
   thirst: z.number(),
-  glucose: z.number(),
   speed: z.number(),
   weight: z.number(),
-  glucoseIntolerance: z.number(),
   walkingSkill: z.number(),
   carryingSkill: z.number(),
+  updated_time: z.number().nullable(),
   location: z
     .object({
       x: z.number(),
@@ -30,6 +18,14 @@ export const GameStateSchema = z.object({
       z: z.number(),
     })
     .nullable(),
+  navigateToLocation: z
+    .object({
+      x: z.number(),
+      y: z.number(),
+      z: z.number(),
+    })
+    .nullable(),
+  navigateToObjectId: z.string().nullable(),
   cameraLocation: z
     .object({
       x: z.number(),
@@ -37,7 +33,7 @@ export const GameStateSchema = z.object({
       z: z.number(),
     })
     .nullable(),
-  scene: z.string(),
+  scene: z.string().nullable(),
 });
 
 export type GameState = z.infer<typeof GameStateSchema>;
@@ -51,30 +47,53 @@ const GotoActionSchema = z.object({
   }),
 });
 
+export type GotoAction = z.infer<typeof GotoActionSchema>;
+
+const PickUpDescriptionSchema = z.object({
+  type: z.union([
+    z.literal("BURGER"),
+    z.literal("WEINER"),
+    z.literal("ROOT_BEER"),
+  ]),
+  quantity: z.number(),
+});
+
+export type PickUpDescription = z.infer<typeof PickUpDescriptionSchema>;
+
 const PickUpActionSchema = z.object({
   type: z.literal("pick_up"),
-  payload: z.string(),
+  payload: PickUpDescriptionSchema,
 });
+
+export type PickUpAction = z.infer<typeof PickUpActionSchema>;
 
 const EatBurgerMessageSchema = z.object({
-  type: z.literal("eatBurger"),
-  payload: z.undefined().optional(),
+  type: z.literal("eat_burger"),
+  payload: z.number().optional(),
 });
+
+export type EatBurgerMessage = z.infer<typeof EatBurgerMessageSchema>;
 
 const EatWeinerMessageSchema = z.object({
-  type: z.literal("eatWeiner"),
-  payload: z.undefined().optional(),
+  type: z.literal("eat_weiner"),
+  payload: z.number().optional(),
 });
 
+export type EatWeinerMessage = z.infer<typeof EatWeinerMessageSchema>;
+
 const DrinkRootBeerMessageSchema = z.object({
-  type: z.literal("drinkRootBeer"),
-  payload: z.undefined().optional(),
+  type: z.literal("drink_root_beer"),
+  payload: z.number().optional(),
 });
+
+export type DrinkRootBeerMessage = z.infer<typeof DrinkRootBeerMessageSchema>;
 
 const UpdateStateMessageSchema = z.object({
   type: z.literal("update_state"),
   payload: GameStateSchema,
 });
+
+export type UpdateStateMessage = z.infer<typeof UpdateStateMessageSchema>;
 
 export const ActionMessageSchema = z.union([
   GotoActionSchema,
@@ -86,3 +105,55 @@ export const ActionMessageSchema = z.union([
 ]);
 
 export type ActionMessage = z.infer<typeof ActionMessageSchema>;
+
+const UpdateMessageSchema = z.object({
+  type: z.literal("update"),
+  payload: GameStateSchema,
+});
+
+const InitialStateMessageSchema = z.object({
+  type: z.literal("initial_state"),
+  payload: GameStateSchema,
+});
+
+export const WorkerMessageSchema = z.union([
+  UpdateMessageSchema,
+  InitialStateMessageSchema,
+]);
+
+export type WorkerMessage = z.infer<typeof WorkerMessageSchema>;
+
+// {
+//   "action": "pick_up",
+//   "id": hover_controller.current_hover_target.get_instance_id()
+// }
+
+// {
+// "action": "go_to",
+// "point": {
+//   "x": closest_point_on_navmesh.x,
+//   "y": closest_point_on_navmesh.y,
+//   "z": closest_point_on_navmesh.z
+// }
+
+// Define Godot context menu actions
+const GodotPickupActionSchema = z.object({
+  action: z.literal("pick_up"),
+  id: z.string(),
+});
+
+const GodotGotoActionSchema = z.object({
+  action: z.literal("go_to"),
+  point: z.object({
+    x: z.number(),
+    y: z.number(),
+    z: z.number(),
+  }),
+});
+
+export const GodotActionSchema = z.union([
+  GodotPickupActionSchema,
+  GodotGotoActionSchema,
+]);
+
+export type GodotAction = z.infer<typeof GodotActionSchema>;

@@ -7,11 +7,12 @@ import {
   Typography,
   Button,
   LinearProgress,
+  Tooltip,
 } from "@mui/material";
 import "./App.css";
 import ContextMenu from "./ContextMenu";
 
-import { Action } from "./schema";
+import { GodotContextAction } from "./schema";
 import { useInventoryStore } from "./inventoryStore";
 import { useGameStore } from "./gameStore";
 import { useGame } from "./useGame";
@@ -27,7 +28,7 @@ function App() {
     anchorPosition: null,
   });
 
-  useGame(iframeRef);
+  const { sendActionToWorker } = useGame(iframeRef);
 
   const rootBeers = useGameStore((state) => state.rootBeers);
   const weiners = useGameStore((state) => state.weiners);
@@ -45,7 +46,7 @@ function App() {
 
   const cameraLocation = useGameStore((state) => state.cameraLocation);
 
-  const [actions, setActions] = useState<Action[]>([]);
+  const [actions, setActions] = useState<GodotContextAction[]>([]);
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -58,23 +59,6 @@ function App() {
       if (event.source !== iframe.contentWindow) return;
 
       if (event.data.type === "godot_oncontextmenu") {
-        // {
-        //     "screen_point": {
-        //         "x": 0.72882866859436,
-        //         "y": 0.287664890289307
-        //     },
-        //     "actions": [
-        //         {
-        //             "action": "go_to",
-        //             "point": {
-        //                 "x": 0.72882866859436,
-        //                 "y": 0.287664890289307,
-        //                 "z": 4.71788883209229
-        //             },
-        //         }
-        //     ]
-        // }
-
         setActions(event.data.actions);
         setContextMenu({
           open: true,
@@ -88,17 +72,40 @@ function App() {
         const quantity = event.data.quantity || 1;
 
         if (objectType === "ROOT_BEER") {
-          useGameStore.setState((state) => ({
-            rootBeers: state.rootBeers + quantity,
-          }));
+          // useGameStore.setState((state) => ({
+          //   rootBeers: state.rootBeers + quantity,
+          // }));
+          sendActionToWorker({
+            type: "pick_up",
+            payload: {
+              type: "ROOT_BEER",
+              quantity,
+            },
+          });
         } else if (objectType === "WEINER") {
-          useGameStore.setState((state) => ({
-            weiners: state.weiners + quantity,
-          }));
+          // useGameStore.setState((state) => ({
+          //   weiners: state.weiners + quantity,
+          // }));
+
+          sendActionToWorker({
+            type: "pick_up",
+            payload: {
+              type: "WEINER",
+              quantity,
+            },
+          });
         } else if (objectType === "BURGER") {
-          useGameStore.setState((state) => ({
-            burgers: state.burgers + quantity,
-          }));
+          // useGameStore.setState((state) => ({
+          //   burgers: state.burgers + quantity,
+          // }));
+
+          sendActionToWorker({
+            type: "pick_up",
+            payload: {
+              type: "BURGER",
+              quantity,
+            },
+          });
         }
       } else if (event.data.type === "godot_camera_position_update") {
         const { x, y, z } = event.data.position;
@@ -111,9 +118,8 @@ function App() {
       } else if (event.data.type === "godot_travel") {
         const distance = event.data.distance;
 
-        useGameStore.setState((state) => ({
-          glucose: state.glucose - distance * 0.1,
-        }));
+        // TODO: increase hunger and thirst based on distance traveled
+        console.log("traveled", distance);
       }
     };
 
@@ -122,7 +128,7 @@ function App() {
     return () => {
       window.removeEventListener("message", handleMessage);
     };
-  }, [setActions, setContextMenu, addToInventory]);
+  }, [setActions, setContextMenu, addToInventory, sendActionToWorker]);
 
   const handleGoTo = (x: number, y: number, z: number) => {
     const iframe = iframeRef.current;
@@ -240,10 +246,15 @@ function App() {
             <Button
               disabled={rootBeers < 1 || thirst < 10}
               onClick={() => {
-                useGameStore.setState((state) => ({
-                  rootBeers: state.rootBeers - 1,
-                  thirst: state.thirst - 10,
-                }));
+                // useGameStore.setState((state) => ({
+                //   rootBeers: state.rootBeers - 1,
+                //   thirst: state.thirst - 10,
+                // }));
+
+                sendActionToWorker({
+                  type: "drink_root_beer",
+                  payload: 1,
+                });
               }}
             >
               Drink
@@ -267,10 +278,15 @@ function App() {
             <Button
               disabled={weiners < 1 || hunger < 10}
               onClick={() => {
-                useGameStore.setState((state) => ({
-                  weiners: state.weiners - 1,
-                  hunger: state.hunger - 10,
-                }));
+                // useGameStore.setState((state) => ({
+                //   weiners: state.weiners - 1,
+                //   hunger: state.hunger - 10,
+                // }));
+
+                sendActionToWorker({
+                  type: "eat_weiner",
+                  payload: 1,
+                });
               }}
             >
               Eat
@@ -294,10 +310,14 @@ function App() {
             <Button
               disabled={burgers < 1 || hunger < 20}
               onClick={() => {
-                useGameStore.setState((state) => ({
-                  burgers: state.burgers - 1,
-                  hunger: state.hunger - 20,
-                }));
+                // useGameStore.setState((state) => ({
+                //   burgers: state.burgers - 1,
+                //   hunger: state.hunger - 20,
+                // }));
+                sendActionToWorker({
+                  type: "eat_burger",
+                  payload: 1,
+                });
               }}
             >
               Eat
@@ -336,11 +356,13 @@ function App() {
               Speed
             </Typography>
 
-            <LinearProgress
-              variant="determinate"
-              value={(speed * 100) / 10}
-              sx={{ width: "100%" }}
-            />
+            <Tooltip title={speed}>
+              <LinearProgress
+                variant="determinate"
+                value={(speed * 100) / 10}
+                sx={{ width: "100%" }}
+              />
+            </Tooltip>
           </Stack>
 
           <h2>Skills</h2>

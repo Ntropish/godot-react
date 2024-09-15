@@ -20,7 +20,6 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
   onPickUp: handlePickUp,
   actions,
 }) => {
-  console.log(actions);
   return (
     <Menu
       open={open}

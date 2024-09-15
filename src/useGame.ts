@@ -1,52 +1,78 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useGameStore } from "./gameStore";
-import { useStore } from "zustand";
+import { ActionMessage, WorkerMessageSchema, WorkerMessage } from "./schema";
 
 export function useGame(iframeRef: React.RefObject<HTMLIFrameElement>) {
   const portRef = useRef<MessagePort | null>(null);
+  const updatePlayerSpeed = useCallback(
+    function updatePlayerSpeed(speed: number) {
+      const iframe = iframeRef.current;
+      if (iframe) {
+        const iframeWindow = iframe.contentWindow;
+        if (iframeWindow) {
+          const speedMessage = {
+            type: "godot_set_player_speed",
+            payload: speed,
+          };
+          const serializedMessage = JSON.stringify(speedMessage);
+          iframeWindow.postMessage(serializedMessage, "*");
+        }
+      }
+    },
+    [iframeRef]
+  );
 
+  // Function to handle messages from the worker
+  const handleWorkerMessage = useCallback(
+    function handleWorkerMessage(message: WorkerMessage) {
+      console.log("got message", message);
+      switch (message.type) {
+        case "update":
+        case "initial_state":
+          console.log("got update", message.payload);
+          // Update the Zustand store with the new game state
+          useGameStore.setState(message.payload);
+
+          // Update the player speed in the iframe
+          updatePlayerSpeed(message.payload.speed);
+          break;
+        default:
+          console.error("Unknown message type from worker");
+      }
+    },
+    [updatePlayerSpeed]
+  );
   useEffect(() => {
     const worker = new SharedWorker(
-      new URL("./gameWorker.js", import.meta.url)
+      new URL("./worker/gameWorker.ts", import.meta.url),
+      {
+        name: "gameWorker",
+        type: "module",
+      }
     );
+
     const port = worker.port;
+    port.start();
     portRef.current = port;
 
-    port.onmessage = (event) => {
-      const { type, payload } = event.data;
-      if (type === "update" || type === "initial_state") {
-        // Update the store with the new game state
-        useGameStore.setState(payload);
+    port.addEventListener("message", (event) => {
+      try {
+        const message = WorkerMessageSchema.parse(event.data);
+        handleWorkerMessage(message);
+      } catch (error) {
+        console.error("Invalid message received from worker:", error);
       }
-    };
+    });
 
     return () => {
       port.close();
     };
-  }, []);
+  }, [handleWorkerMessage]);
 
-  const playerSpeed = useStore(useGameStore, (state) => state.speed);
-
-  useEffect(() => {
-    const iframe = iframeRef.current;
-    if (!iframe) return;
-
-    const iframeWindow = iframe.contentWindow;
-    if (!iframeWindow) return;
-
-    const message = {
-      type: "godot_set_player_speed",
-      payload: playerSpeed,
-    };
-
-    const serializedMessage = JSON.stringify(message);
-    iframeWindow.postMessage(serializedMessage, "*");
-  }, [playerSpeed, iframeRef]);
-
-  // Expose a function to send messages to the worker
-  const sendActionToWorker = (actionType: string, payload?: any) => {
-    if (portRef.current) {
-      portRef.current.postMessage({ type: actionType, payload });
+  const sendActionToWorker = (action: ActionMessage) => {
+    const port = portRef.current;
+    if (port) {
+      port.postMessage(action);
     }
   };
 
