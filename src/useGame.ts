@@ -8,6 +8,10 @@ import {
   TaskConsume,
 } from "./schema";
 import { GameState } from "./schema";
+import { getLevelFromXP } from "./getLevelFromXP";
+import { getLevelProgress } from "./getLevelProgress";
+import { getXPStats } from "./getXPStats";
+import { addXP } from "./addXP";
 
 const weights = {
   root_beer: 1.5,
@@ -124,8 +128,23 @@ export function useGame({
       } else if (event.data.type === "godot_travel") {
         const distance = event.data.distance;
 
-        // TODO: increase hunger and thirst based on distance traveled
-        console.log("traveled", distance);
+        const weightMultiplier =
+          clamp(useGameStore.getState().weight - 20, 0, 100) / 100;
+        const xp = distance * weightMultiplier;
+        const thirstDelta = -distance * weightMultiplier * 0.05;
+        const hungerDelta = -distance * weightMultiplier * 0.05;
+        useGameStore.setState((state) => {
+          const newXp = state.walkingSkill.xp + xp;
+          const xpStats = getXPStats(newXp);
+          return {
+            walkingSkill: {
+              xp: newXp,
+              ...xpStats,
+            },
+            thirst: clamp(state.thirst + thirstDelta, 0, 100),
+            hunger: clamp(state.hunger + hungerDelta, 0, 100),
+          };
+        });
       } else if (event.data.type === "godot_consume") {
         const time = event.data.time;
 
@@ -298,40 +317,50 @@ function updateGameState(oldState: GameState): GameState {
     weiner * weights.weiner +
     burger * weights.burger;
 
-  const unburdenedWeight = 20 + carryingSkill * 10;
+  const unburdenedWeight = 20 + carryingSkill.level * 10;
 
   const burden = Math.max(0, carriedWeight - unburdenedWeight);
-
-  const metabolism = clamp(100 - hunger, 1, 100);
 
   const carryBurn = burden * 0.01;
   const thirstDelta = 0.001 + carryBurn * 0.0001;
 
-  const hungerDelta = metabolism * 0.001;
+  const hungerDelta = burden * 0.001;
+  const carryingSkillDelta = burden * 0.001;
 
-  const carryingSkillDelta = carryBurn * 0.1;
+  // const baseWalkSpeed = 5;
+  // const skillSpeedBoost = 0.1 * walkingSkill.level;
 
-  const baseWalkSpeed = 5;
-  const skillSpeedBoost = 0.1 * walkingSkill;
-  const quenchedSpeedBoost = (clamp(30 - thirst, 0, 100) / 30) * 3;
-  const burdenSpeedBurn = 0.1 * burden;
-  const metabolismFactor = metabolism / 100;
+  // const burdenSpeedBurn = 0.5 * burden;
 
-  const minimumSpeed = 0.5 + 0.01 * walkingSkill;
+  // const minimumSpeed = 0.5 + 0.01 * walkingSkill.level;
 
-  const playerSpeed = Math.max(
-    minimumSpeed,
-    metabolismFactor * (baseWalkSpeed + skillSpeedBoost) +
-      quenchedSpeedBoost -
-      burdenSpeedBurn
-  );
+  // const playerSpeed = Math.max(
+  //   minimumSpeed,
+  //   baseWalkSpeed + skillSpeedBoost + quenchedSpeedBoost - burdenSpeedBurn
+  // );
+  const quenched = clamp(100 - thirst, 0, 100) / 100;
+  const satiated = clamp(100 - hunger, 0, 100) / 100;
+
+  const minimumSpeed = 0.5 + 0.01 * walkingSkill.level;
+
+  const maximumSpeed = 5 + 0.2 * walkingSkill.level;
+
+  const speedMultiplier = quenched * satiated;
+
+  const playerSpeed =
+    minimumSpeed + (maximumSpeed - minimumSpeed) * speedMultiplier;
+
+  const newCarryingSkill = addXP(carryingSkill, carryingSkillDelta);
 
   return {
     ...oldState,
     hunger: clamp(hunger + hungerDelta, 0, 100),
     thirst: clamp(thirst + thirstDelta, 0, 100),
-    carryingSkill: Math.max(0, carryingSkill + carryingSkillDelta),
+    carryingSkill: newCarryingSkill,
     speed: playerSpeed,
+    speedMultiplier,
+    minimumSpeed,
+    maximumSpeed,
     weight: carriedWeight,
   };
 }

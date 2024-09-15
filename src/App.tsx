@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 
 import {
   Box,
@@ -15,6 +15,7 @@ import ContextMenu from "./ContextMenu";
 import { useGameStore } from "./store/gameStore";
 import { useGame } from "./useGame";
 import theme from "./theme";
+import { SkillTooltip } from "./SkillTooltip";
 
 function App() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -29,6 +30,11 @@ function App() {
   const burgers = useGameStore((state) => state.burger);
 
   const speed = useGameStore((state) => state.speed);
+  const speedMultiplier = useGameStore((state) => state.speedMultiplier);
+
+  const minimumSpeed = useGameStore((state) => state.minimumSpeed);
+  const maximumSpeed = useGameStore((state) => state.maximumSpeed);
+
   const weight = useGameStore((state) => state.weight);
 
   const hunger = useGameStore((state) => state.hunger);
@@ -207,7 +213,6 @@ function App() {
           </Stack>
 
           <h2>Stats</h2>
-          {/* <p>Hunger: {hunger}</p> */}
           <Stack direction="row" alignItems={"center"}>
             <Typography variant="caption" flexBasis="10rem">
               Hunger
@@ -231,42 +236,91 @@ function App() {
               sx={{ width: "100%" }}
             />
           </Stack>
-          <Stack direction="row" alignItems={"center"}>
-            <Typography variant="caption" flexBasis="10rem">
-              Speed
-            </Typography>
+          <Tooltip title={speed}>
+            <Stack direction="column">
+              <Stack
+                direction="row"
+                alignItems={"center"}
+                justifyContent={"space-between"}
+              >
+                <Typography variant="caption">Speed</Typography>
 
-            <Tooltip title={speed}>
+                <Typography variant="caption">
+                  {Intl.NumberFormat("en-IN", {
+                    maximumFractionDigits: 2,
+                    minimumFractionDigits: 2,
+                  }).format(speed)}{" "}
+                  /{" "}
+                  {Intl.NumberFormat("en-IN", {
+                    maximumFractionDigits: 2,
+                    minimumFractionDigits: 2,
+                  }).format(maximumSpeed)}
+                </Typography>
+              </Stack>
               <LinearProgress
                 variant="determinate"
-                value={(speed * 100) / 10}
+                value={speedMultiplier * 100}
                 sx={{ width: "100%" }}
               />
-            </Tooltip>
-          </Stack>
+            </Stack>
+          </Tooltip>
 
           <h2>Skills</h2>
-          <Stack direction="row" alignItems={"center"} sx={{}}>
-            <Typography variant="caption" sx={{ flexBasis: "10rem" }}>
-              Walking
-            </Typography>
-            <LinearProgress
-              variant="determinate"
-              value={walkingSkill}
-              sx={{ width: "100%" }}
-            ></LinearProgress>
-          </Stack>
+          <Tooltip title={<SkillTooltip skill={walkingSkill} />}>
+            <Stack direction="column">
+              <Stack
+                direction="row"
+                alignItems={"center"}
+                justifyContent={"space-between"}
+              >
+                <Typography variant="caption">Walking</Typography>
+                <Box>
+                  <Typography
+                    variant="caption"
+                    sx={{ fontFamily: "monospace" }}
+                  >
+                    {Intl.NumberFormat("en-IN", {
+                      maximumFractionDigits: 2,
+                      minimumFractionDigits: 2,
+                    }).format(walkingSkill.remainingXP)}
+                  </Typography>
+                </Box>
+              </Stack>
+              <LinearProgress
+                variant="determinate"
+                value={walkingSkill.progress * 100}
+                sx={{ width: "100%" }}
+              ></LinearProgress>
+            </Stack>
+          </Tooltip>
 
-          <Stack direction="row" alignItems={"center"}>
-            <Typography variant="caption" sx={{ flexBasis: "10rem" }}>
-              Carrying
-            </Typography>
-            <LinearProgress
-              variant="determinate"
-              value={carryingSkill}
-              sx={{ width: "100%" }}
-            ></LinearProgress>
-          </Stack>
+          <Tooltip title={<SkillTooltip skill={carryingSkill} />}>
+            <Stack direction="column">
+              <Stack
+                direction="row"
+                alignItems={"center"}
+                justifyContent={"space-between"}
+              >
+                <Typography variant="caption">Carrying</Typography>
+                <Box>
+                  <Typography
+                    variant="caption"
+                    sx={{ fontFamily: "monospace" }}
+                  >
+                    {Intl.NumberFormat("en-IN", {
+                      maximumFractionDigits: 2,
+                      minimumFractionDigits: 2,
+                    }).format(carryingSkill.remainingXP)}
+                  </Typography>
+                </Box>
+              </Stack>
+              <LinearProgress
+                variant="determinate"
+                value={carryingSkill.progress * 100}
+                sx={{ width: "100%" }}
+              ></LinearProgress>
+            </Stack>
+          </Tooltip>
         </Box>
       </Stack>
     </Stack>

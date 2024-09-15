@@ -45,6 +45,8 @@ export const TaskConsumeSchema = z.object({
   amount: z.number(),
 });
 
+export type TaskConsume = z.infer<typeof TaskConsumeSchema>;
+
 export const TaskSchema = z.union([
   TaskGoToPointSchema,
   TaskGoToObjectSchema,
@@ -98,16 +100,29 @@ export type GodotContextAction = z.infer<typeof GodotContextActionSchema>;
 /**
  *
  */
+
+export const SkillSchema = z.object({
+  xp: z.number(),
+  level: z.number(),
+  progress: z.number(),
+  remainingXP: z.number(),
+});
+
+export type Skill = z.infer<typeof SkillSchema>;
+
 export const GameStateSchema = z.object({
   root_beer: z.number(),
   weiner: z.number(),
   burger: z.number(),
   hunger: z.number(),
   thirst: z.number(),
+  minimumSpeed: z.number(),
+  maximumSpeed: z.number(),
+  speedMultiplier: z.number(),
   speed: z.number(),
   weight: z.number(),
-  walkingSkill: z.number(),
-  carryingSkill: z.number(),
+  walkingSkill: SkillSchema,
+  carryingSkill: SkillSchema,
   location: Point3Schema.nullable(),
   task: TaskSchema.nullable(),
   cameraLocation: Point3Schema.nullable(),
