@@ -9,9 +9,9 @@ export const Point3Schema = z.object({
 export type Point3 = z.infer<typeof Point3Schema>;
 
 export const ConsumableSchema = z.union([
-  z.literal("ROOT_BEER"),
-  z.literal("WEINER"),
-  z.literal("BURGER"),
+  z.literal("root_beer"),
+  z.literal("weiner"),
+  z.literal("burger"),
 ]);
 
 export type Consumable = z.infer<typeof ConsumableSchema>;

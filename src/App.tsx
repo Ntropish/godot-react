@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useState } from "react";
 
 import {
   Box,
@@ -12,33 +12,17 @@ import {
 import "./App.css";
 import ContextMenu from "./ContextMenu";
 
-import { GodotAction, GodotContextAction } from "./schema";
 import { useGameStore } from "./store/gameStore";
 import { useGame } from "./useGame";
+import theme from "./theme";
 
 function App() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  const [contextMenu, setContextMenu] = useState<{
-    open: boolean;
-    anchorPosition: { top: number; left: number } | null;
-  }>({
-    open: false,
-    anchorPosition: null,
-  });
-
-  const sendMessageToGodot = (message: GodotAction) => {
-    const iframe = iframeRef.current;
-    if (!iframe) return;
-
-    const iframeWindow = iframe.contentWindow;
-    if (!iframeWindow) return;
-
-    const serializedMessage = JSON.stringify(message);
-    iframeWindow.postMessage(serializedMessage, "*");
-  };
-
-  const { goToPoint, consume, pickUp } = useGame({ sendMessageToGodot });
+  const { goToPoint, consume, pickUp, actions, contextMenu, closeContextMenu } =
+    useGame({
+      iframeRef,
+    });
 
   const rootBeers = useGameStore((state) => state.root_beer);
   const weiners = useGameStore((state) => state.weiner);
@@ -53,67 +37,6 @@ function App() {
   const carryingSkill = useGameStore((state) => state.carryingSkill);
 
   const cameraLocation = useGameStore((state) => state.cameraLocation);
-
-  const [actions, setActions] = useState<GodotContextAction[]>([]);
-
-  useEffect(() => {
-    const iframe = iframeRef.current;
-    if (!iframe) return;
-
-    const iframeWindow = iframe.contentWindow;
-    if (!iframeWindow) return;
-
-    const handleMessage = (event: MessageEvent) => {
-      if (event.source !== iframe.contentWindow) return;
-
-      if (event.data.type === "godot_oncontextmenu") {
-        setActions(event.data.actions);
-        setContextMenu({
-          open: true,
-          anchorPosition: {
-            top: event.data.screen_point.y / 1.5,
-            left: event.data.screen_point.x / 1.5,
-          },
-        });
-      } else if (event.data.type === "godot_onpickup") {
-        const objectType = event.data.object_type;
-        const quantity = event.data.quantity || 1;
-
-        if (objectType === "ROOT_BEER") {
-          useGameStore.setState((state) => ({
-            root_beer: state.root_beer + quantity,
-          }));
-        } else if (objectType === "WEINER") {
-          useGameStore.setState((state) => ({
-            weiner: state.weiner + quantity,
-          }));
-        } else if (objectType === "BURGER") {
-          useGameStore.setState((state) => ({
-            burger: state.burger + quantity,
-          }));
-        }
-      } else if (event.data.type === "godot_camera_position_update") {
-        const { x, y, z } = event.data.position;
-
-        useGameStore.setState({ cameraLocation: { x, y, z } });
-      } else if (event.data.type === "godot_location_update") {
-        const { x, y, z } = event.data.position;
-
-        useGameStore.setState({ location: { x, y, z } });
-      } else if (event.data.type === "godot_travel") {
-        const distance = event.data.distance;
-
-        // TODO: increase hunger and thirst based on distance traveled
-        console.log("traveled", distance);
-      }
-    };
-
-    window.addEventListener("message", handleMessage);
-
-    return () => {
-      window.removeEventListener("message", handleMessage);
-    };
-  }, [setActions, setContextMenu]);
 
   const gameUrl = "/godot-react/game_build/index.html";
 
@@ -155,7 +78,7 @@ function App() {
         <ContextMenu
           open={contextMenu.open}
           anchorPosition={contextMenu.anchorPosition}
-          onClose={() => setContextMenu({ ...contextMenu, open: false })}
+          onClose={closeContextMenu}
           onGoTo={goToPoint}
           onPickUp={pickUp}
           actions={actions}
@@ -163,13 +86,21 @@ function App() {
       </Box>
 
       <Stack sx={{ flex: "0 0 24rem" }}>
-        <p>Drag the screen to move the camera</p>
-        <p>Right click to act</p>
-        <Divider />
         <Box sx={{ m: 2 }}>
           <Typography variant="h4" sx={{ fontWeight: 300 }}>
             Cookout Creek
           </Typography>
+        </Box>
+        <Divider />
+        <Box
+          sx={{
+            fontSize: "0.8rem",
+            m: 2,
+            color: theme.palette.text.secondary,
+          }}
+        >
+          <p>Drag the screen to move the camera</p>
+          <p>Right click to act</p>
         </Box>
         <Divider />
 
@@ -179,9 +110,15 @@ function App() {
           }}
         >
           <h2>Inventory</h2>
-          <p>Weight: {weight}</p>
+          <p>
+            Weight:&nbsp;
+            {Intl.NumberFormat("en-IN", {
+              maximumFractionDigits: 2,
+              minimumFractionDigits: 2,
+            }).format(weight)}
+          </p>
 
-          <Stack direction="row" alignItems={"center"}>
+          <Stack direction="row" alignItems={"baseline"}>
             <Typography
               sx={{
                 flexBasis: "10rem",
@@ -192,20 +129,25 @@ function App() {
             <Typography
               sx={{
                 flexBasis: "5rem",
+                fontFamily: "monospace",
+                textAlign: "right",
               }}
             >
-              {rootBeers}
+              {Intl.NumberFormat("en-IN", {
+                maximumFractionDigits: 2,
+                minimumFractionDigits: 2,
+              }).format(rootBeers)}
             </Typography>
             <Button
               disabled={rootBeers <= 0 || thirst < 1}
               onClick={() => {
-                consume("ROOT_BEER", 1);
+                consume("root_beer", 1);
               }}
             >
               Drink
             </Button>
           </Stack>
-          <Stack direction="row">
+          <Stack direction="row" alignItems={"baseline"}>
             <Typography
               sx={{
                 flexBasis: "10rem",
@@ -216,20 +158,25 @@ function App() {
             <Typography
               sx={{
                 flexBasis: "5rem",
+                fontFamily: "monospace",
+                textAlign: "right",
               }}
             >
-              {weiners}
+              {Intl.NumberFormat("en-IN", {
+                maximumFractionDigits: 2,
+                minimumFractionDigits: 2,
+              }).format(weiners)}
             </Typography>
             <Button
               disabled={weiners <= 0 || hunger < 1}
               onClick={() => {
-                consume("WEINER", 1);
+                consume("weiner", 1);
               }}
             >
               Eat
             </Button>
           </Stack>
-          <Stack direction="row">
+          <Stack direction="row" alignItems={"baseline"}>
             <Typography
               sx={{
                 flexBasis: "10rem",
@@ -240,14 +187,19 @@ function App() {
             <Typography
               sx={{
                 flexBasis: "5rem",
+                fontFamily: "monospace",
+                textAlign: "right",
               }}
             >
-              {burgers}
+              {Intl.NumberFormat("en-IN", {
+                maximumFractionDigits: 2,
+                minimumFractionDigits: 2,
+              }).format(burgers)}
             </Typography>
             <Button
               disabled={burgers <= 0 || hunger < 1}
               onClick={() => {
-                consume("BURGER", 1);
+                consume("burger", 1);
               }}
             >
               Eat
@@ -267,8 +219,7 @@ function App() {
               sx={{ width: "100%" }}
             />
           </Stack>
-          {/* <p>Thirst: {thirst}</p>
-           */}
+
           <Stack direction="row" alignItems={"center"}>
             <Typography variant="caption" flexBasis="10rem">
               Thirst
@@ -280,7 +231,6 @@ function App() {
               sx={{ width: "100%" }}
             />
           </Stack>
-          {/* <p>Speed: {speed}</p> */}
           <Stack direction="row" alignItems={"center"}>
             <Typography variant="caption" flexBasis="10rem">
               Speed
@@ -296,8 +246,6 @@ function App() {
           </Stack>
 
           <h2>Skills</h2>
-          {/* <p>Walking Skill: {walkingSkill}</p> */}
-          {/* <p>Carrying Skill: {carryingSkill}</p> */}
           <Stack direction="row" alignItems={"center"} sx={{}}>
             <Typography variant="caption" sx={{ flexBasis: "10rem" }}>
               Walking

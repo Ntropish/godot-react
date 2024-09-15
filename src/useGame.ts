@@ -1,6 +1,12 @@
-import { useEffect, useCallback, useMemo } from "react";
+import { useEffect, useCallback, useMemo, useState } from "react";
 import { useGameStore } from "./store/gameStore";
-import { Consumable, GodotAction, Point3 } from "./schema";
+import {
+  Consumable,
+  GodotAction,
+  GodotContextAction,
+  Point3,
+  TaskConsume,
+} from "./schema";
 import { GameState } from "./schema";
 
 const weights = {
@@ -10,9 +16,24 @@ const weights = {
 };
 
 const consumption_rates = {
-  root_beer: 10,
-  weiner: 5,
-  burger: 15,
+  root_beer: 0.1,
+  weiner: 0.2,
+  burger: 0.05,
+};
+
+const consumption_effects = {
+  root_beer: {
+    hunger: 0,
+    thirst: -10,
+  },
+  weiner: {
+    hunger: -10,
+    thirst: 2,
+  },
+  burger: {
+    hunger: -20,
+    thirst: 5,
+  },
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -20,10 +41,126 @@ function clamp(value: number, min: number, max: number) {
 }
 
 export function useGame({
-  sendMessageToGodot,
+  iframeRef,
 }: {
-  sendMessageToGodot: (message: GodotAction) => void;
+  iframeRef: React.RefObject<HTMLIFrameElement>;
 }) {
+  const sendMessageToGodot = useCallback(
+    (message: GodotAction) => {
+      const iframe = iframeRef.current;
+      if (!iframe) return;
+
+      const iframeWindow = iframe.contentWindow;
+      if (!iframeWindow) return;
+
+      const serializedMessage = JSON.stringify(message);
+      iframeWindow.postMessage(serializedMessage, "*");
+    },
+    [iframeRef]
+  );
+
+  const [actions, setActions] = useState<GodotContextAction[]>([]);
+
+  const [contextMenu, setContextMenu] = useState<{
+    open: boolean;
+    anchorPosition: { top: number; left: number } | null;
+  }>({
+    open: false,
+    anchorPosition: null,
+  });
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu((state) => ({
+      ...state,
+      open: false,
+    }));
+  }, []);
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    const iframeWindow = iframe.contentWindow;
+    if (!iframeWindow) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      console.log("from godot", event.data);
+      if (event.source !== iframe.contentWindow) return;
+
+      if (event.data.type === "godot_oncontextmenu") {
+        setActions(event.data.actions);
+        setContextMenu({
+          open: true,
+          anchorPosition: {
+            top: event.data.screen_point.y / 1.5,
+            left: event.data.screen_point.x / 1.5,
+          },
+        });
+      } else if (event.data.type === "godot_onpickup") {
+        const objectType = event.data.object_type;
+        const quantity = event.data.quantity || 1;
+
+        if (objectType === "root_beer") {
+          useGameStore.setState((state) => ({
+            root_beer: state.root_beer + quantity,
+          }));
+        } else if (objectType === "weiner") {
+          useGameStore.setState((state) => ({
+            weiner: state.weiner + quantity,
+          }));
+        } else if (objectType === "burger") {
+          useGameStore.setState((state) => ({
+            burger: state.burger + quantity,
+          }));
+        }
+      } else if (event.data.type === "godot_camera_position_update") {
+        const { x, y, z } = event.data.position;
+
+        useGameStore.setState({ cameraLocation: { x, y, z } });
+      } else if (event.data.type === "godot_location_update") {
+        const { x, y, z } = event.data.position;
+
+        useGameStore.setState({ location: { x, y, z } });
+      } else if (event.data.type === "godot_travel") {
+        const distance = event.data.distance;
+
+        // TODO: increase hunger and thirst based on distance traveled
+        console.log("traveled", distance);
+      } else if (event.data.type === "godot_consume") {
+        const time = event.data.time;
+
+        const currentState = useGameStore.getState();
+
+        if (currentState.task?.type === "consume") {
+          const { consumable } = currentState.task;
+          const rate = consumption_rates[consumable];
+          const currentAmount = currentState[consumable];
+          const amount = Math.min(rate * time, currentAmount);
+
+          const newTask = {
+            ...currentState.task,
+            amount: currentState.task.amount - amount,
+          } as TaskConsume;
+
+          const effects = consumption_effects[consumable];
+
+          useGameStore.setState((state) => ({
+            [consumable]: state[consumable] - amount,
+            hunger: state.hunger + (effects.hunger * amount || 0),
+            thirst: state.thirst + (effects.thirst * amount || 0),
+            task: newTask,
+          }));
+        }
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+
+    return () => {
+      window.removeEventListener("message", handleMessage);
+    };
+  }, [setActions, iframeRef]);
+
   // These functions set a task for the character
   const goToPoint = useCallback(
     (point: Point3) => {
@@ -97,7 +234,7 @@ export function useGame({
         action: "consume_consumable",
         consumable,
         amount,
-        time_remaining: consumption_rates[consumable] * amount,
+        time_remaining: amount / consumption_rates[consumable],
       });
 
       return amount;
@@ -129,8 +266,19 @@ export function useGame({
       goToObject,
       pickUp,
       consume,
+      actions,
+      contextMenu,
+      closeContextMenu,
     };
-  }, [goToPoint, goToObject, pickUp, consume]);
+  }, [
+    goToPoint,
+    goToObject,
+    pickUp,
+    consume,
+    actions,
+    contextMenu,
+    closeContextMenu,
+  ]);
 }
 
 // One second tick update
