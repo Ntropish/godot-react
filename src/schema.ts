@@ -122,6 +122,7 @@ export const GameStateSchema = z.object({
   speed: z.number(),
   weight: z.number(),
   maximumCarryWeight: z.number(),
+  burden: z.number(),
   walkingSkill: SkillSchema,
   carryingSkill: SkillSchema,
   location: Point3Schema.nullable(),

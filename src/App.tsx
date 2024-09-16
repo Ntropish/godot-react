@@ -48,6 +48,10 @@ function App() {
   const carryingSkill = useGameStore((state) => state.carryingSkill);
 
   const cameraLocation = useGameStore((state) => state.cameraLocation);
+  // This resets the camera height, otherwise it tends to drift
+  if (cameraLocation) cameraLocation.y = 14;
+
+  const playerLocation = useGameStore((state) => state.location);
 
   let weightColor = "primary" as "primary" | "secondary" | "error" | "warning";
   if (weight > maximumCarryWeight) {
@@ -87,6 +91,10 @@ function App() {
           // Have to add the base path here
           data-initial-camera-position={
             cameraLocation ? JSON.stringify(cameraLocation) : undefined
+          }
+          data-initial-player-speed={speed}
+          data-initial-player-location={
+            playerLocation ? JSON.stringify(playerLocation) : undefined
           }
           src={gameUrl}
           title="game"

@@ -18,6 +18,7 @@ export const useGameStore = create<GameState>()(
       /** calculated stats */
       weight: 0,
       maximumCarryWeight: 20,
+      burden: 0,
 
       speed: 1,
 
@@ -53,7 +54,6 @@ export const useGameStore = create<GameState>()(
     }),
     {
       name: "game-state", // unique name
-      storage: createJSONStorage(() => sessionStorage),
     }
   )
 );

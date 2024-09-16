@@ -12,28 +12,28 @@ import { getXPStats } from "./getXPStats";
 import { addXP } from "./addXP";
 
 const weights = {
-  root_beer: 1.5,
+  root_beer: 2,
   weiner: 1,
-  burger: 1,
+  burger: 1.5,
 };
 
 const consumption_rates = {
-  root_beer: 0.1,
-  weiner: 0.2,
-  burger: 0.05,
+  root_beer: 0.01,
+  weiner: 0.01,
+  burger: 0.005,
 };
 
 const consumption_effects = {
   root_beer: {
     hunger: 0,
-    thirst: -10,
+    thirst: -25,
   },
   weiner: {
-    hunger: -10,
+    hunger: -15,
     thirst: 2,
   },
   burger: {
-    hunger: -20,
+    hunger: -40,
     thirst: 5,
   },
 };
@@ -124,20 +124,16 @@ export function useGame({
         useGameStore.setState({ location: { x, y, z } });
       } else if (event.data.type === "godot_travel") {
         const distance = event.data.distance;
+        const burden = useGameStore.getState().burden;
 
-        const weightMultiplier =
-          clamp(useGameStore.getState().weight - 20, 0, 100) / 100;
-        const xp = distance * weightMultiplier;
-        const thirstDelta = -distance * weightMultiplier * 0.05;
-        const hungerDelta = -distance * weightMultiplier * 0.05;
+        const xp = distance * (1 + burden / 100);
+        const thirstDelta = (distance * (1 + burden / 100)) / 5;
+        const hungerDelta = (distance * (1 + burden / 100)) / 5;
+
         useGameStore.setState((state) => {
-          const newXp = state.walkingSkill.xp + xp;
-          const xpStats = getXPStats(newXp);
+          const newWalkingSkill = addXP(state.walkingSkill, xp);
           return {
-            walkingSkill: {
-              xp: newXp,
-              ...xpStats,
-            },
+            walkingSkill: newWalkingSkill,
             thirst: clamp(state.thirst + thirstDelta, 0, 100),
             hunger: clamp(state.hunger + hungerDelta, 0, 100),
           };
@@ -260,12 +256,6 @@ export function useGame({
 
   // 1 second tick
   useEffect(() => {
-    // Send the initial player speed
-    sendMessageToGodot({
-      action: "set_player_speed",
-      speed: useGameStore.getState().speed,
-    });
-
     const timer = setInterval(() => {
       const oldState = useGameStore.getState();
       const newState = updateGameState(oldState);
@@ -322,14 +312,13 @@ function updateGameState(oldState: GameState): GameState {
 
   const maximumCarryWeight = 20 + carryingSkill.level * 5;
 
-  const unburdenedWeight = 20 + carryingSkill.level * 10;
+  const unburdenedWeight = maximumCarryWeight * 0.2;
 
   const burden = Math.max(0, carriedWeight - unburdenedWeight);
+  const maxBurden = maximumCarryWeight - unburdenedWeight;
 
-  const carryBurn = burden * 0.01;
-  const thirstDelta = 0.001 + carryBurn * 0.0001;
-
-  const hungerDelta = burden * 0.01;
+  const thirstDelta = 0.001 + burden * 0.0001;
+  const hungerDelta = 0.001 + burden * 0.001;
   const carryingSkillDelta = burden * 0.001;
 
   const quenched = clamp(100 - thirst, 0, 100) / 100;
@@ -338,12 +327,16 @@ function updateGameState(oldState: GameState): GameState {
   const minimumSpeed = 3 + 0.1 * walkingSkill.level;
   const maximumSpeed = 5 + 0.2 * walkingSkill.level;
 
-  const speedMultiplier = quenched * satiated;
+  let speedMultiplier = quenched * satiated - burden / maxBurden / 2;
+  console.log(speedMultiplier, quenched, satiated);
 
   let playerSpeed = minimumSpeed / 2;
   if (carriedWeight < maximumCarryWeight) {
     playerSpeed =
       minimumSpeed + (maximumSpeed - minimumSpeed) * speedMultiplier;
+  } else {
+    // multiplier for speed when carrying too much, this value is used in the UI
+    speedMultiplier = 0;
   }
 
   const newCarryingSkill = addXP(carryingSkill, carryingSkillDelta);
@@ -358,6 +351,7 @@ function updateGameState(oldState: GameState): GameState {
     minimumSpeed,
     maximumSpeed,
     weight: carriedWeight,
+    burden,
     maximumCarryWeight,
   };
 }
